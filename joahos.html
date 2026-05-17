@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>JOSH OS - Pro Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-url: url('https://i.ibb.co/Fdj8Wpg/otis-hd.webp');
+        }
+
+        body {
+            background-image: var(--bg-url);
+            background-size: cover;
+            background-position: center;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            color: #000;
+            overflow: hidden;
+            transition: background-image 0.5s ease-in-out;
+        }
+
+        .top-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(10px);
+            padding: 0 15px;
+            font-weight: 600;
+            font-size: 13px;
+            z-index: 10000;
+            height: 30px;
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+        }
+
+        .desktop {
+            flex-grow: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .window {
+            display: none;
+            flex-direction: column;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(15px);
+            border-radius: 12px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+            position: absolute;
+            z-index: 100;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+
+        .window-header {
+            background: #e5e7eb;
+            height: 35px;
+            display: flex;
+            align-items: center;
+            padding: 0 12px;
+            cursor: move;
+            user-select: none;
+        }
+
+        .window-controls {
+            display: flex;
+            gap: 8px;
+        }
+
+        .ctrl {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        .ctrl-close { background: #ff5f56; }
+        .ctrl-min { background: #ffbd2e; }
+        .ctrl-max { background: #27c93f; }
+
+        .window-title {
+            flex-grow: 1;
+            text-align: center;
+            font-size: 13px;
+            font-weight: bold;
+            margin-right: 40px;
+        }
+
+        .dock-container {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: flex-end;
+            background: rgba(255, 255, 255, 0.3);
+            backdrop-filter: blur(20px);
+            padding: 8px;
+            border-radius: 20px;
+            border: 1px solid rgba(255,255,255,0.4);
+            gap: 10px;
+            z-index: 20000;
+        }
+
+        .dock-item {
+            width: 50px;
+            height: 50px;
+            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            position: relative;
+        }
+
+        .dock-item:hover {
+            width: 80px;
+            height: 80px;
+            margin: 0 10px;
+        }
+
+        .dock-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .finder-body { display: flex; height: 100%; min-height: 0; }
+        .sidebar { width: 180px; background: rgba(0,0,0,0.03); border-right: 1px solid rgba(0,0,0,0.05); padding: 15px 10px; }
+        .sidebar-item { padding: 6px 10px; border-radius: 6px; font-size: 13px; cursor: pointer; margin-bottom: 2px; display: flex; align-items: center; gap: 8px; }
+        .sidebar-item:hover { background: rgba(0,0,0,0.05); }
+        .sidebar-item.active { background: #3b82f6; color: white; }
+
+        .content-area { flex-grow: 1; padding: 20px; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 15px; align-content: flex-start; }
+        
+        .file-item { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 5px; padding: 10px; border-radius: 8px; cursor: pointer; border: 1px solid transparent; }
+        .file-item:hover { background: rgba(59, 130, 246, 0.1); }
+        .file-item.selected { background: rgba(59, 130, 246, 0.2); border-color: rgba(59, 130, 246, 0.3); }
+        .file-item i { font-size: 40px; }
+        .file-item img { width: 48px; height: 48px; object-fit: cover; border-radius: 4px; }
+        .file-item span { font-size: 12px; word-break: break-all; color: inherit; }
+
+        .details-pane { width: 220px; border-left: 1px solid rgba(0,0,0,0.05); padding: 20px; display: flex; flex-direction: column; align-items: center; text-align: center; font-size: 12px; }
+        .details-pane img { width: 120px; height: 120px; object-fit: cover; border-radius: 8px; margin-bottom: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+
+        /* Desktop Icons */
+        .desktop-icon { 
+            position: absolute; 
+            width: 80px; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            gap: 5px; 
+            cursor: pointer; 
+            text-shadow: 0 1px 2px rgba(0,0,0,0.8); 
+            color: white; 
+            font-size: 12px; 
+            text-align: center;
+        }
+        .desktop-icon:hover img { filter: brightness(1.1); }
+        .desktop-icon img { width: 50px; height: 50px; object-fit: contain; }
+        .desktop-icon i { font-size: 40px; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+
+        .dropdown-menu { display: none; position: absolute; top: 30px; left: 10px; background: white; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); width: 200px; z-index: 50000; overflow: hidden; border: 1px solid rgba(0,0,0,0.1); }
+        .dropdown-menu div { padding: 10px 15px; font-size: 13px; cursor: pointer; }
+        .dropdown-menu div:hover { background: #3b82f6; color: white; }
+
+        .artist-bg {
+            background: linear-gradient(to bottom, rgba(0,0,0,0.7), #121212);
+            color: white;
+            height: 100%;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="top-bar">
+        <div class="flex items-center gap-4">
+            <span class="cursor-pointer hover:opacity-70" onclick="toggleMenu(event)">
+                <img src="https://i.ibb.co/23z6psTD/NEW-EYE-LOGO-BLACK-VEC.png" class="h-5" alt="Logo">
+            </span>
+            <span id="active-app-name">Finder</span>
+            <span class="font-normal opacity-60">File</span>
+            <span class="font-normal opacity-60">Edit</span>
+            <span class="font-normal opacity-60">View</span>
+            <span class="font-normal opacity-60">Go</span>
+        </div>
+        <div class="flex items-center gap-4">
+            <i class="fa-solid fa-wifi"></i>
+            <i class="fa-solid fa-battery-three-quarters"></i>
+            <span id="clock">12:00 PM</span>
+        </div>
+        
+        <div id="apple-menu" class="dropdown-menu">
+            <div onclick="openApp('about')">About This Mac</div>
+            <hr class="opacity-10">
+            <div onclick="openApp('settings')">System Settings...</div>
+            <div onclick="addSticky()">New Sticky Note</div>
+            <hr class="opacity-10">
+            <div onclick="location.reload()">Restart...</div>
+        </div>
+    </div>
+
+    <div class="desktop" id="desktop" onclick="deselectAll()">
+        <!-- Hard Drive -->
+        <div class="desktop-icon" style="top: 20px; right: 20px;" ondblclick="openApp('finder', 'OTIS HD')">
+            <img src="https://storage.googleapis.com/a1aa/image/jMxKHVcIdp6WMh5VG1uwZh6jLdfua2dMpUecBTKc0DRNqj3TA.jpg" alt="HD">
+            <span>OTIS HD</span>
+        </div>
+
+        <!-- NEW APPS -->
+        <div class="desktop-icon" style="top: 20px; left: 20px;" ondblclick="openApp('mail')">
+            <img src="https://i.ibb.co/PchL9R9/mail-icon.png" onerror="this.src='https://cdn-icons-png.flaticon.com/512/561/561127.png'">
+            <span>Mail</span>
+        </div>
+
+        <div class="desktop-icon" style="top: 110px; left: 20px;" ondblclick="openUrl('https://youtube.com')">
+            <img src="https://cdn-icons-png.flaticon.com/512/1384/1384060.png" alt="YouTube">
+            <span>YouTube</span>
+        </div>
+
+        <div class="desktop-icon" style="top: 200px; left: 20px;" ondblclick="openUrl('https://twitch.tv')">
+            <img src="https://cdn-icons-png.flaticon.com/512/5968/5968819.png" alt="Twitch">
+            <span>Twitch</span>
+        </div>
+
+        <div class="desktop-icon" style="top: 290px; left: 20px;" ondblclick="openApp('artist-page')">
+            <img src="https://i.ibb.co/FgsHvFX/os.png" alt="Josh Otis App">
+            <span>OTIS MUSIC</span>
+        </div>
+
+        <!-- Desktop Files (MP3s) -->
+        <div class="desktop-icon" style="top: 110px; right: 20px;" ondblclick="openFile('Desktop', 0)">
+            <i class="fa-solid fa-file-audio text-blue-400"></i>
+            <span>Demo_Vibe.mp3</span>
+        </div>
+
+        <div class="desktop-icon" style="top: 200px; right: 20px;" ondblclick="openFile('Desktop', 1)">
+            <i class="fa-solid fa-file-audio text-pink-400"></i>
+            <span>Late_Night.mp3</span>
+        </div>
+
+        <!-- FINDER WINDOW -->
+        <div id="finder" class="window" style="width: 850px; height: 500px; top: 100px; left: 150px;">
+            <div class="window-header" onmousedown="dragWindow(event, 'finder')">
+                <div class="window-controls">
+                    <div class="ctrl ctrl-close" onclick="closeApp('finder')"></div>
+                    <div class="ctrl ctrl-min"></div>
+                    <div class="ctrl ctrl-max"></div>
+                </div>
+                <div class="window-title" id="finder-title">Finder</div>
+            </div>
+            <div class="finder-body">
+                <div class="sidebar" id="sidebar-list"></div>
+                <div class="content-area" id="file-grid"></div>
+                <div class="details-pane" id="file-details">
+                    <div class="opacity-30 mt-20 text-center">Select a file to preview</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PHOTO VIEWER -->
+        <div id="photo-viewer" class="window" style="width: 600px; height: 450px; top: 150px; left: 200px;">
+            <div class="window-header" onmousedown="dragWindow(event, 'photo-viewer')">
+                <div class="window-controls"><div class="ctrl ctrl-close" onclick="closeApp('photo-viewer')"></div></div>
+                <div class="window-title" id="photo-title">Photo</div>
+            </div>
+            <div class="photo-view flex items-center justify-center bg-black h-full overflow-hidden">
+                <img id="photo-img" src="" class="max-w-full max-h-full object-contain">
+            </div>
+        </div>
+
+        <!-- MUSIC PLAYER -->
+        <div id="music-player" class="window" style="width: 350px; height: 480px; top: 100px; left: 500px;">
+            <div class="window-header" onmousedown="dragWindow(event, 'music-player')">
+                <div class="window-controls"><div class="ctrl ctrl-close" onclick="closeApp('music-player')"></div></div>
+                <div class="window-title">Now Playing</div>
+            </div>
+            <div class="p-6 flex flex-col items-center text-center">
+                <img id="music-art" src="" class="w-64 h-64 rounded-2xl shadow-xl mb-6 object-cover bg-gray-200">
+                <h2 id="music-name" class="font-bold text-lg mb-1">Track Name</h2>
+                <p class="text-sm opacity-60 mb-6">Josh Otis</p>
+                <audio id="audio-node" controls class="w-full"></audio>
+            </div>
+        </div>
+
+        <!-- MAIL APP -->
+        <div id="mail" class="window" style="width: 700px; height: 450px; top: 80px; left: 200px;">
+            <div class="window-header" onmousedown="dragWindow(event, 'mail')">
+                <div class="window-controls"><div class="ctrl ctrl-close" onclick="closeApp('mail')"></div></div>
+                <div class="window-title">Mail</div>
+            </div>
+            <div class="flex h-full">
+                <div class="w-1/3 border-r bg-gray-50 p-4 space-y-4">
+                    <div class="bg-blue-100 p-3 rounded-lg border-l-4 border-blue-500 cursor-pointer">
+                        <div class="font-bold text-xs">CULT VZN Studio</div>
+                        <div class="text-[10px] opacity-70">Mastering Complete</div>
+                        <div class="text-[9px] mt-1 line-clamp-1">Yo Josh, the White Beamer stems are ready...</div>
+                    </div>
+                    <div class="p-3 rounded-lg hover:bg-gray-200 cursor-pointer transition">
+                        <div class="font-bold text-xs">Apple Music For Artists</div>
+                        <div class="text-[10px] opacity-70">Weekly Report</div>
+                    </div>
+                </div>
+                <div class="flex-1 p-8">
+                    <h1 class="text-2xl font-bold mb-2">Mastering Complete</h1>
+                    <div class="flex items-center gap-2 mb-6">
+                        <div class="w-8 h-8 rounded-full bg-black text-white flex items-center justify-center text-[10px]">CV</div>
+                        <div>
+                            <div class="text-xs font-bold">CULT VZN Studio</div>
+                            <div class="text-[10px] opacity-50">To: Josh Otis &lt;josh@otis.hd&gt;</div>
+                        </div>
+                    </div>
+                    <div class="text-sm leading-relaxed opacity-80">
+                        Yo Josh,<br><br>
+                        The mastering for the latest single is finished. It sounds massive. Check the OTIS HD folder for the high-res export.<br><br>
+                        Stay CULT.<br>— CV Team
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ARTIST PAGE (JOSH OTIS MUSIC APP) -->
+        <div id="artist-page" class="window" style="width: 900px; height: 600px; top: 50px; left: 100px;">
+            <div class="window-header" onmousedown="dragWindow(event, 'artist-page')">
+                <div class="window-controls"><div class="ctrl ctrl-close" onclick="closeApp('artist-page')"></div></div>
+                <div class="window-title">Josh Otis - Artist Profile</div>
+            </div>
+            <div class="artist-bg">
+                <div class="h-64 relative bg-cover bg-center" style="background-image: url('https://i.ibb.co/0yWVB89F/IMG-2291.jpg');">
+                    <div class="absolute inset-0 bg-black/40 flex flex-col justify-end p-8">
+                        <div class="flex items-center gap-2 text-blue-400 font-bold text-xs mb-2">
+                            <i class="fa-solid fa-circle-check"></i> VERIFIED ARTIST
+                        </div>
+                        <h1 class="text-7xl font-black italic tracking-tighter">JOSH OTIS</h1>
+                        <p class="mt-4 text-sm opacity-80">42,500 Monthly Listeners</p>
+                    </div>
+                </div>
+                <div class="p-8">
+                    <div class="flex gap-4 mb-8">
+                        <button class="bg-green-500 text-black font-bold px-8 py-3 rounded-full hover:scale-105 transition" onclick="openFile('OTIS HD', 0)">PLAY</button>
+                        <button class="border border-white/20 px-8 py-3 rounded-full font-bold hover:bg-white/10 transition">FOLLOW</button>
+                    </div>
+                    
+                    <h3 class="text-xl font-bold mb-4">Popular</h3>
+                    <div class="space-y-2">
+                        <div class="flex items-center gap-4 p-2 hover:bg-white/5 rounded group cursor-pointer" onclick="openFile('OTIS HD', 0)">
+                            <span class="w-4 text-center opacity-40">1</span>
+                            <img src="https://i.ibb.co/23gTPFV/whitebeamer.png" class="w-10 h-10 rounded shadow">
+                            <span class="flex-1 font-medium">White Beamer</span>
+                            <span class="opacity-40 text-xs">3:24</span>
+                        </div>
+                        <div class="flex items-center gap-4 p-2 hover:bg-white/5 rounded group cursor-pointer" onclick="openFile('Desktop', 1)">
+                            <span class="w-4 text-center opacity-40">2</span>
+                            <img src="https://i.ibb.co/Fdj8Wpg/otis-hd.webp" class="w-10 h-10 rounded shadow">
+                            <span class="flex-1 font-medium">Late Night Sessions</span>
+                            <span class="opacity-40 text-xs">2:58</span>
+                        </div>
+                    </div>
+
+                    <h3 class="text-xl font-bold mt-12 mb-4">Available On</h3>
+                    <div class="flex gap-6">
+                        <div class="flex flex-col items-center gap-2 cursor-pointer opacity-70 hover:opacity-100" onclick="openUrl('https://spotify.com')">
+                            <i class="fa-brands fa-spotify text-3xl text-green-500"></i>
+                            <span class="text-[10px]">Spotify</span>
+                        </div>
+                        <div class="flex flex-col items-center gap-2 cursor-pointer opacity-70 hover:opacity-100" onclick="openUrl('https://music.apple.com')">
+                            <i class="fa-brands fa-apple text-3xl"></i>
+                            <span class="text-[10px]">Apple Music</span>
+                        </div>
+                        <div class="flex flex-col items-center gap-2 cursor-pointer opacity-70 hover:opacity-100" onclick="openUrl('https://soundcloud.com')">
+                            <i class="fa-brands fa-soundcloud text-3xl text-orange-500"></i>
+                            <span class="text-[10px]">Soundcloud</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SETTINGS WINDOW -->
+        <div id="settings" class="window" style="width: 500px; height: 400px; top: 120px; left: 300px;">
+            <div class="window-header" onmousedown="dragWindow(event, 'settings')">
+                <div class="window-controls"><div class="ctrl ctrl-close" onclick="closeApp('settings')"></div></div>
+                <div class="window-title">System Settings</div>
+            </div>
+            <div class="p-4 overflow-y-auto h-full">
+                <h3 class="font-bold mb-4 px-2">Wallpaper</h3>
+                <div class="grid grid-cols-2 gap-4 p-2" id="wallpaper-options"></div>
+            </div>
+        </div>
+
+        <!-- ABOUT WINDOW -->
+        <div id="about" class="window" style="width: 400px; height: auto; top: 200px; left: 400px; background: rgba(30,30,30,0.9); color: white;">
+            <div class="window-header" style="background: transparent;" onmousedown="dragWindow(event, 'about')">
+                <div class="window-controls"><div class="ctrl ctrl-close" onclick="closeApp('about')"></div></div>
+            </div>
+            <div class="p-8 flex flex-col items-center text-center">
+                <img src="https://i.ibb.co/FgsHvFX/os.png" class="w-20 mb-4 rounded-xl">
+                <h1 class="text-2xl font-bold tracking-tight">JOSH OS PRO</h1>
+                <p class="opacity-60 text-sm mb-6">Version 24.05.1 (Artist Edition)</p>
+                <div class="w-full text-left space-y-2 text-xs border-t border-white/10 pt-4">
+                    <div class="flex justify-between"><span>CPU</span><span class="opacity-60">OTIS-CHIP M1X</span></div>
+                    <div class="flex justify-between"><span>VIBE</span><span class="opacity-60">Infinite</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="dock-container">
+        <div class="dock-item" data-label="Finder" onclick="openApp('finder', 'OTIS HD')">
+            <img src="https://i.ibb.co/j3Xjr3G/custom-finder-icon.png">
+        </div>
+        <div class="dock-item" data-label="Photos" onclick="openApp('finder', 'Photos')">
+            <img src="https://i.ibb.co/3MjStwg/pngwing-com-5.png">
+        </div>
+        <div class="dock-item" data-label="Settings" onclick="openApp('settings')">
+            <img src="https://i.ibb.co/GcM36JV/safari-icon.png">
+        </div>
+        <div class="dock-item" data-label="Music" onclick="openApp('artist-page')">
+            <img src="https://i.ibb.co/bb3Dz7V/pngegg-3.png">
+        </div>
+    </div>
+
+    <script>
+        const folders = {
+            "OTIS HD": [
+                { name: "White Beamer.mp3", type: "audio", src: "https://raw.githubusercontent.com/junokira/whitebeamer/main/whitebeamer.mp3", art: "https://i.ibb.co/23gTPFV/whitebeamer.png", size: "8.4 MB", date: "May 10, 2026" },
+                { name: "White_Beamer_Stems.zip", type: "file", icon: "fa-file-zipper", size: "142 MB", date: "May 12, 2026" },
+                { name: "OTIS&ANTI-111.jpg", type: "image", src: "https://i.ibb.co/PTB6DVT/slide111-1.png", size: "2.1 MB", date: "Apr 20, 2026" },
+                { name: "NOISEMAG-P7.jpg", type: "image", src: "https://i.ibb.co/zS4SbSs/OTIS-SLIDE-111-3.png", size: "3.5 MB", date: "May 01, 2026" },
+                { name: "Rough_Cut_01.mp3", type: "audio", src: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3", size: "4.2 MB", date: "Today" }
+            ],
+            "Photos": [
+                { name: "IMG_5605.jpg", type: "image", src: "https://i.ibb.co/XrH5DX0H/IMG-5605.jpg", size: "4.2 MB", date: "May 14, 2026" },
+                { name: "CULT_VZN.jpg", type: "image", src: "https://i.ibb.co/dwtJ4MB5/adb42bd4-6ec8-437a-9b74-4596f4646fbd.jpg", size: "5.1 MB", date: "May 13, 2026" },
+                { name: "IMG_5319.jpg", type: "image", src: "https://i.ibb.co/k2tbhXNm/IMG-5319.jpg", size: "4.5 MB", date: "May 12, 2026" },
+                { name: "OS_VZN_2000.jpg", type: "image", src: "https://i.ibb.co/pjx1ZxdJ/DDC7635-F-E776-4155-9-BB3-CAAF2-BDA6441.jpg", size: "4.9 MB", date: "Yesterday" }
+            ],
+            "Desktop": [
+                { name: "Demo_Vibe.mp3", type: "audio", src: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3", size: "5.4 MB", date: "May 15, 2026" },
+                { name: "Late_Night.mp3", type: "audio", src: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3", size: "6.8 MB", date: "May 16, 2026" }
+            ]
+        };
+
+        const wallpapers = [
+            'https://i.ibb.co/Fdj8Wpg/otis-hd.webp',
+            'https://i.ibb.co/Wp6YJfH7/clouds-1.png',
+            'https://i.ibb.co/dJ6kPKGc/2080497e-4932-444f-a08b-b079631663cb.jpg',
+            'https://i.ibb.co/0yWVB89F/IMG-2291.jpg'
+        ];
+
+        let currentFolder = "OTIS HD";
+        let zCounter = 100;
+
+        function openApp(id, folder = null) {
+            const win = document.getElementById(id);
+            win.style.display = 'flex';
+            win.style.zIndex = ++zCounter;
+            document.getElementById('active-app-name').innerText = id.charAt(0).toUpperCase() + id.slice(1);
+            
+            if (id === 'finder' && folder) {
+                renderFinder(folder);
+            }
+            if (id === 'settings') {
+                renderSettings();
+            }
+        }
+
+        function closeApp(id) {
+            document.getElementById(id).style.display = 'none';
+            if (id === 'music-player') {
+                document.getElementById('audio-node').pause();
+            }
+        }
+
+        function dragWindow(e, id) {
+            const win = document.getElementById(id);
+            win.style.zIndex = ++zCounter;
+            let pos1 = 0, pos2 = 0, pos3 = e.clientX, pos4 = e.clientY;
+            
+            document.onmousemove = (e) => {
+                pos1 = pos3 - e.clientX;
+                pos2 = pos4 - e.clientY;
+                pos3 = e.clientX;
+                pos4 = e.clientY;
+                win.style.top = (win.offsetTop - pos2) + "px";
+                win.style.left = (win.offsetLeft - pos1) + "px";
+            };
+
+            document.onmouseup = () => {
+                document.onmousemove = null;
+                document.onmouseup = null;
+            };
+        }
+
+        function renderFinder(folderName) {
+            currentFolder = folderName;
+            document.getElementById('finder-title').innerText = folderName;
+            
+            const sidebar = document.getElementById('sidebar-list');
+            sidebar.innerHTML = Object.keys(folders).map(f => `
+                <div class="sidebar-item ${f === folderName ? 'active' : ''}" onclick="renderFinder('${f}')">
+                    <i class="fa-solid fa-folder"></i> ${f}
+                </div>
+            `).join('');
+
+            const grid = document.getElementById('file-grid');
+            grid.innerHTML = (folders[folderName] || []).map((file, idx) => `
+                <div class="file-item" 
+                     onclick="selectFile(event, '${folderName}', ${idx})" 
+                     ondblclick="openFile('${folderName}', ${idx})">
+                    ${file.type === 'image' ? `<img src="${file.src}">` : 
+                      file.type === 'audio' ? `<i class="fa-solid fa-file-audio text-blue-500"></i>` :
+                      `<i class="fa-solid ${file.icon || 'fa-file'} text-gray-400"></i>`}
+                    <span>${file.name}</span>
+                </div>
+            `).join('');
+            
+            document.getElementById('file-details').innerHTML = `<div class="opacity-30 mt-20 text-center">Select a file to preview info</div>`;
+        }
+
+        function selectFile(e, folder, idx) {
+            e.stopPropagation();
+            const file = folders[folder][idx];
+            const items = document.querySelectorAll('.file-item');
+            items.forEach(i => i.classList.remove('selected'));
+            e.currentTarget.classList.add('selected');
+
+            const details = document.getElementById('file-details');
+            const previewImg = file.type === 'image' ? file.src : (file.art || 'https://placehold.co/200x200/333/666?text=File');
+            
+            // ENSURE METADATA IS SHOWN HERE
+            details.innerHTML = `
+                <div class="animate-in fade-in duration-300">
+                    <img src="${previewImg}" class="rounded-lg mb-4 mx-auto w-32 h-32 object-cover shadow-lg">
+                    <div class="font-bold text-sm mb-1">${file.name}</div>
+                    <div class="text-[10px] opacity-60 uppercase mb-4">${file.type}</div>
+                    
+                    <div class="text-left w-full space-y-2 border-t border-black/5 pt-4">
+                        <div class="flex justify-between">
+                            <span class="opacity-50">Size</span>
+                            <span class="font-medium">${file.size || 'Unknown'}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="opacity-50">Kind</span>
+                            <span class="font-medium capitalize">${file.type}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="opacity-50">Modified</span>
+                            <span class="font-medium">${file.date || 'Jan 1, 2024'}</span>
+                        </div>
+                    </div>
+
+                    <button class="mt-8 w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 rounded-lg text-[10px] transition" 
+                            onclick="openFile('${folder}', ${idx})">OPEN FILE</button>
+                </div>
+            `;
+        }
+
+        function openFile(folder, idx) {
+            const file = folders[folder][idx];
+            if (file.type === 'image') {
+                document.getElementById('photo-img').src = file.src;
+                document.getElementById('photo-title').innerText = file.name;
+                openApp('photo-viewer');
+            } else if (file.type === 'audio') {
+                document.getElementById('music-name').innerText = file.name;
+                document.getElementById('music-art').src = file.art || 'https://placehold.co/300x300/333/666?text=Audio';
+                const player = document.getElementById('audio-node');
+                player.src = file.src;
+                openApp('music-player');
+                player.play();
+            }
+        }
+
+        function openUrl(url) {
+            window.open(url, '_blank');
+        }
+
+        function renderSettings() {
+            const grid = document.getElementById('wallpaper-options');
+            grid.innerHTML = wallpapers.map(wp => `
+                <div class="h-24 rounded-lg cursor-pointer bg-cover bg-center border-2 border-transparent hover:border-blue-400" 
+                     style="background-image: url('${wp}')" 
+                     onclick="setWallpaper('${wp}')"></div>
+            `).join('');
+        }
+
+        function setWallpaper(url) {
+            document.body.style.setProperty('--bg-url', `url('${url}')`);
+        }
+
+        function toggleMenu(e) {
+            e.stopPropagation();
+            const menu = document.getElementById('apple-menu');
+            menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+        }
+
+        function deselectAll() {
+            document.getElementById('apple-menu').style.display = 'none';
+            document.querySelectorAll('.file-item').forEach(i => i.classList.remove('selected'));
+        }
+
+        function addSticky() {
+            const id = 'sticky-' + Date.now();
+            const sticky = document.createElement('div');
+            sticky.id = id;
+            sticky.className = 'window p-4 w-48 h-48 bg-yellow-200 shadow-xl border-none text-black';
+            sticky.style.display = 'flex';
+            sticky.style.top = '100px';
+            sticky.style.left = '300px';
+            sticky.style.zIndex = ++zCounter;
+            sticky.onmousedown = (e) => dragWindow(e, id);
+            sticky.innerHTML = `
+                <div class="flex justify-between items-start mb-2">
+                    <div class="ctrl ctrl-close" onclick="document.getElementById('${id}').remove()"></div>
+                </div>
+                <textarea class="bg-transparent border-none outline-none resize-none w-full h-full text-xs" placeholder="Note to self..."></textarea>
+            `;
+            document.getElementById('desktop').appendChild(sticky);
+            document.getElementById('apple-menu').style.display = 'none';
+        }
+
+        setInterval(() => {
+            const d = new Date();
+            document.getElementById('clock').innerText = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }, 1000);
+
+        window.onload = () => {
+            renderFinder("OTIS HD");
+        };
+    </script>
+</body>
+</html>
